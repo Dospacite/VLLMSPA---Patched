@@ -1,0 +1,56 @@
+services:
+  flask:
+    build:
+      context: ./backend
+      dockerfile: ../docker/flask.dockerfile
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/llm_vuln
+    depends_on:
+      - postgres
+      - ollama
+    user: root
+    privileged: true
+    security_opt:
+      - seccomp:unconfined
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+
+  postgres:
+    image: postgres:15
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_DB=llm_vuln
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+
+  ollama:
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  pgdata:
+  ollama-data:

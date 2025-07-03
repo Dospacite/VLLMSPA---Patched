@@ -1,0 +1,15 @@
+Flask
+Flask-JWT-Extended
+Flask-SQLAlchemy
+Flask-Migrate
+psycopg2-binary
+Werkzeug
+dotenv
+requests
+Flask-CORS
+uuid
+langchain
+langchain-community
+langchain-core
+langchain-ollama
+pydantic>=2.0.0
