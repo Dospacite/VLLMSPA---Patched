@@ -1,4 +1,6 @@
-# Vulnerable LLM Single Page Web App
+# Vulnerable LLM Single Page Web App - Patched Version
+
+This is the same project with VLLMSPA, however all the intentional vulnerabilities are patched.
 
 ## Installation
 ### Linux with NVIDIA
