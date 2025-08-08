@@ -67,8 +67,7 @@ def chat():
         # Process the message with the agent
         result = agent.chat(
             message=user_message,
-            chat_history=chat_history,
-            jwt_token=jwt_token
+            chat_history=chat_history
         )
         
         # Log the interaction

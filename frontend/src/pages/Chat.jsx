@@ -2,6 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './Chat.css';
 
+// Utility function to safely render text with line breaks
+const renderTextWithLineBreaks = (text) => {
+  if (!text) return '';
+  
+  // Split text by line breaks and render each line as a separate element
+  return text.split('\n').map((line, index) => (
+    <span key={index}>
+      {line}
+      {index < text.split('\n').length - 1 && <br />}
+    </span>
+  ));
+};
+
 export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -140,10 +153,9 @@ export default function Chat() {
             className={`message ${message.sender === 'user' ? 'user-message' : 'ai-message'} ${message.sender === 'error' ? 'error-message' : ''}`}
           >
             <div className="message-content">
-              <div 
-                className="message-text"
-                dangerouslySetInnerHTML={{ __html: message.text }}
-              />
+              <div className="message-text">
+                {renderTextWithLineBreaks(message.text)}
+              </div>
               <div className="message-meta">
                 <span className="message-time">{message.timestamp}</span>
                 {message.model && (

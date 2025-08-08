@@ -68,32 +68,3 @@
   color: #333;
   font-weight: 600;
 }
-
-.vulnerability-notice {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 8px;
-  padding: 20px;
-  margin-top: 20px;
-}
-
-.vulnerability-notice h3 {
-  color: #856404;
-  margin: 0 0 12px 0;
-  font-size: 1.3rem;
-}
-
-.vulnerability-notice p {
-  color: #856404;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.vulnerability-notice code {
-  background: #f8f9fa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: #e83e8c;
-}

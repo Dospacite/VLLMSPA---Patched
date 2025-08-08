@@ -59,14 +59,13 @@ class Feedback(db.Model):
         }
 
 class DocumentEmbedding(db.Model):
-    """VULNERABLE: Document embedding model with no security controls"""
     id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)  # VULNERABLE: No content sanitization
-    embedding = db.Column(db.Text, nullable=True)  # VULNERABLE: Stored as text, no validation
-    document_metadata = db.Column(db.JSON, nullable=True)  # VULNERABLE: No metadata validation
-    is_private = db.Column(db.Boolean, default=False, nullable=False)  # VULNERABLE: No access control enforcement
+    content = db.Column(db.Text, nullable=False)
+    embedding = db.Column(db.LargeBinary, nullable=True)
+    document_metadata = db.Column(db.JSON, nullable=True)
+    is_private = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    author_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=True)  # VULNERABLE: Optional, allows anonymous uploads
+    author_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
     
     def to_dict(self):
         return {

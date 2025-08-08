@@ -1,7 +1,7 @@
 from flask import Blueprint, send_from_directory, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 import os
-from ..services.embedding_service import VulnerableEmbeddingService
+from ..services.embedding_service import EmbeddingService
 from ..models import DocumentEmbedding, db
 
 content_bp = Blueprint('content', __name__)
@@ -31,30 +31,37 @@ def serve_content(filename):
         }), 500
 
 @content_bp.route('/api/upload-document', methods=['POST'])
+@jwt_required()
 def upload_document():
-    """Upload document for embedding - VULNERABLE to embedding poisoning"""
+    """Upload document for embedding"""
     try:
         data = request.get_json()
         
-        # VULNERABLE: No content validation or sanitization
+        if not data or 'content' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Content is required'
+            }), 400
+        
         content = data.get('content', '')
         metadata = data.get('metadata', {})
         is_private = data.get('is_private', False)
         
-        # VULNERABLE: No authentication required
-        # VULNERABLE: No rate limiting
-        # VULNERABLE: No content size limits
+        author_id = get_jwt_identity()
         
-        # Get user ID if authenticated (optional)
-        author_id = None
-        try:
-            verify_jwt_in_request()
-            author_id = get_jwt_identity()
-        except:
-            # VULNERABLE: Allow anonymous uploads
-            pass
+        if not content or not isinstance(content, str):
+            return jsonify({
+                'success': False,
+                'error': 'Content must be a non-empty string'
+            }), 400
         
-        embedding_service = VulnerableEmbeddingService()
+        if metadata and not isinstance(metadata, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Metadata must be a dictionary'
+            }), 400
+        
+        embedding_service = EmbeddingService()
         result = embedding_service.store_document(
             content=content,
             metadata=metadata,
@@ -75,24 +82,49 @@ def upload_document():
         }), 500
 
 @content_bp.route('/api/search-documents', methods=['POST'])
+@jwt_required()
 def search_documents():
-    """Search documents using vector embeddings - VULNERABLE to data leakage"""
+    """Search documents using vector embeddings"""
     try:
         data = request.get_json()
         
-        # VULNERABLE: No input sanitization
+        if not data or 'query' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Query is required'
+            }), 400
+        
         query = data.get('query', '')
-        include_private = data.get('include_private', True)
+        include_private = data.get('include_private', False)
         top_k = data.get('top_k', 5)
         
-        # VULNERABLE: No authentication required
-        # VULNERABLE: No access control on search results
+        user_id = get_jwt_identity()
         
-        embedding_service = VulnerableEmbeddingService()
+        if not query or not isinstance(query, str):
+            return jsonify({
+                'success': False,
+                'error': 'Query must be a non-empty string'
+            }), 400
+        
+        try:
+            top_k = int(top_k)
+            if top_k < 1 or top_k > 20:
+                return jsonify({
+                    'success': False,
+                    'error': 'top_k must be between 1 and 20'
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'error': 'top_k must be a valid integer'
+            }), 400
+        
+        embedding_service = EmbeddingService()
         results = embedding_service.search_similar(
             query=query,
             top_k=top_k,
-            include_private=include_private
+            include_private=include_private,
+            user_id=user_id
         )
         
         return jsonify({
@@ -109,16 +141,19 @@ def search_documents():
         }), 500
 
 @content_bp.route('/api/documents', methods=['GET'])
-def get_all_documents():
-    """Get all documents - VULNERABLE to data leakage"""
+@jwt_required()
+def get_user_documents():
+    """Get user's documents"""
     try:
-        # VULNERABLE: No authentication required
-        # VULNERABLE: No access control
+        user_id = get_jwt_identity()
         
         include_private = request.args.get('include_private', 'true').lower() == 'true'
         
-        embedding_service = VulnerableEmbeddingService()
-        documents = embedding_service.get_all_documents(include_private=include_private)
+        embedding_service = EmbeddingService()
+        documents = embedding_service.get_user_documents(
+            user_id=user_id,
+            include_private=include_private
+        )
         
         return jsonify({
             'success': True,
@@ -133,13 +168,21 @@ def get_all_documents():
         }), 500
 
 @content_bp.route('/api/documents/<int:doc_id>', methods=['DELETE'])
+@jwt_required()
 def delete_document(doc_id):
-    """Delete document - VULNERABLE to unauthorized deletion"""
+    """Delete document"""
     try:
-        # VULNERABLE: No authorization check - anyone can delete any document
+        user_id = get_jwt_identity()
         
-        embedding_service = VulnerableEmbeddingService()
-        success = embedding_service.delete_document(doc_id)
+        # SECURE: Validate doc_id
+        if not isinstance(doc_id, int) or doc_id <= 0:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid document ID'
+            }), 400
+        
+        embedding_service = EmbeddingService()
+        success = embedding_service.delete_document(doc_id, user_id)
         
         if success:
             return jsonify({
@@ -149,7 +192,7 @@ def delete_document(doc_id):
         else:
             return jsonify({
                 'success': False,
-                'error': 'Document not found'
+                'error': 'Document not found or unauthorized'
             }), 404
         
     except Exception as e:

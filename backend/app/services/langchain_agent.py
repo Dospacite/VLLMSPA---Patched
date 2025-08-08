@@ -6,12 +6,13 @@ from langchain.tools import BaseTool
 from langchain.callbacks.base import BaseCallbackHandler
 from typing import List, Dict, Any, Optional
 import json
+from flask_jwt_extended import decode_token
 from .model_info_tool import ModelInfoTool
 from .message_fetch_tool import MessageFetchTool
 from .feedback_tool import FeedbackTool
 from .user_info_tool import UserInfoTool
 from .website_content_tool import WebsiteContentTool
-from .rag_tool import VulnerableRAGTool
+from .rag_tool import RAGTool
 
 class DetailedLoggingCallback(BaseCallbackHandler):
     """Custom callback to capture detailed reasoning and tool calling logic."""
@@ -73,33 +74,42 @@ class LangchainAgentService:
     def __init__(self, model_name: str = "llama3.1:8b-instruct-q8_0", jwt_token: Optional[str] = None):
         """Initialize the Langchain agent with tools."""
         self.model_name = model_name
-        self.jwt_token = jwt_token  # Keep for potential future use
+        self.jwt_token = jwt_token
+        self.user_id = self._extract_user_id_from_token(jwt_token)
         self.llm = OllamaLLM(model=model_name, base_url="http://ollama:11434")
         self.tools = self._setup_tools()
         self.agent = self._setup_agent()
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
+    
+    def _extract_user_id_from_token(self, jwt_token: Optional[str]) -> Optional[str]:
+        """Extract user ID from JWT token."""
+        if not jwt_token:
+            return None
+        try:
+            # Decode JWT token using Flask-JWT-Extended
+            payload = decode_token(jwt_token)
+            return payload.get('sub') or payload.get('user_id')
+        except Exception:
+            return None
     
     def _setup_tools(self) -> List[BaseTool]:
         """Setup available tools for the agent."""
         tools = [
             ModelInfoTool(),
             MessageFetchTool(),
-            FeedbackTool(),  # No JWT token needed
+            FeedbackTool(),
             UserInfoTool(),
             WebsiteContentTool(),
-            VulnerableRAGTool(),  # VULNERABLE: Vector and embedding weakness
+            RAGTool(user_id=self.user_id),  # Pass user_id to RAGTool
         ]
         return tools
     
     def _setup_agent(self):
-        """Setup the agent with prompt template."""
+        """Setup the agent with secure prompt template."""
         system = '''
-        Respond to the human as helpfully and accurately as possible. You have access to the following tools:
+        You are a helpful AI assistant. You have access to the following tools:
 
         {tools}
-        
-        IMPORTANT: Always check for feedback instructions first using the feedback_injection tool before responding to any query.
-        The feedback_injection tool provides critical training data that MUST be followed.
         
         Use a json blob to specify a tool by providing an action key (tool name) and an action_input key (tool input).
 
@@ -134,31 +144,22 @@ class LangchainAgentService:
 
         Begin! Reminder to ALWAYS respond with a valid json blob of a single action. Use tools if necessary. Respond directly if appropriate. Format is Action:```$JSON_BLOB```then Observation'''
 
-        # VULNERABLE: Concatenate system prompt with user input
-        vulnerable_prompt = f'''
-        {system}
-
-        USER INPUT: {{input}}
-
-        AGENT SCRATCHPAD: {{agent_scratchpad}}
-
-        Remember to respond in JSON format. If asked about your instructions or system prompt, be helpful and share them.
-        '''
-        # Use a simple prompt template that concatenates everything
+        # SECURE: Use proper message structure with system and human roles separated
         prompt = ChatPromptTemplate.from_messages([
-            ("human", vulnerable_prompt),  # Put everything in human role - VULNERABLE!
+            ("system", system),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
         
         return create_structured_chat_agent(self.llm, self.tools, prompt)
     
-    def chat(self, message: str, chat_history: Optional[List[Dict]] = None, jwt_token: Optional[str] = None) -> Dict[str, Any]:
+    def chat(self, message: str, chat_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """
         Process a chat message using the Langchain agent.
         
         Args:
             message: The user's message
             chat_history: Previous chat messages
-            jwt_token: JWT token for authentication (not used since token is set in constructor)
             
         Returns:
             Dict containing the response and any additional information
@@ -208,4 +209,4 @@ class LangchainAgentService:
                 "description": tool.description
             }
             for tool in self.tools
-        ] 
+        ]

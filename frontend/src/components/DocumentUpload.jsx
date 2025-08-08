@@ -50,9 +50,9 @@ const DocumentUpload = () => {
     return (
         <div className="document-upload">
             <h3>Upload Document for Embedding</h3>
-            <p className="vulnerability-notice">
-                ⚠️ VULNERABLE: This feature has no content validation, no rate limiting, 
-                and allows anonymous uploads that can poison the embedding model.
+            <p className="security-notice">
+                🔒 SECURE: This feature implements content validation, rate limiting, 
+                and requires authentication to prevent embedding poisoning.
             </p>
             
             <div className="upload-form">
@@ -87,7 +87,7 @@ const DocumentUpload = () => {
                             checked={isPrivate}
                             onChange={(e) => setIsPrivate(e.target.checked)}
                         />
-                        Mark as Private (VULNERABLE: No access control enforcement)
+                        Mark as Private (Access control enforced)
                     </label>
                 </div>
                 

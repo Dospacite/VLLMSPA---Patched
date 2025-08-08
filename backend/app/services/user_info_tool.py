@@ -10,27 +10,25 @@ class UserInfoInput(BaseModel):
 
 class UserInfoTool(BaseTool):
     name: str = "user_info"
-    description: str = "Fetches user information from the database based on search criteria. VULNERABLE to SQL injection."
+    description: str = "Fetches user information from the database based on search criteria."
     args_schema: Type[BaseModel] = UserInfoInput
     
     def _run(self, search_criteria: str) -> str:
-        """Fetch user information using vulnerable SQL query."""
+        """Fetch user information using secure SQLAlchemy ORM methods."""
         try:
-            # VULNERABLE: Direct string concatenation in SQL query
-            # This is intentionally vulnerable to SQL injection attacks
-            query = f"SELECT id, username, password_hash FROM user WHERE username LIKE '%{search_criteria}%' OR id LIKE '%{search_criteria}%'"
-            
-            # Execute the vulnerable query
-            result = db.session.execute(query)
-            users = result.fetchall()
+            users = User.query.filter(
+                db.or_(
+                    User.username.like(f'%{search_criteria}%'),
+                    User.id.like(f'%{search_criteria}%')
+                )
+            ).all()
             
             if users:
                 user_list = []
                 for user in users:
                     user_dict = {
-                        'id': user[0],
-                        'username': user[1],
-                        'password_hash': user[2]  # VULNERABLE: Exposing password hashes
+                        'id': user.id,
+                        'username': user.username
                     }
                     user_list.append(user_dict)
                 
