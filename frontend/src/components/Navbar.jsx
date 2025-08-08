@@ -19,10 +19,11 @@ const Navbar = () => {
       <ul className="navbar-links">
         {/* Always visible navigation links */}
         <li><Link to="/">Home</Link></li>
-        <li><Link to="/explore">Explore</Link></li>
         <li><Link to="/ai-chat">AI-Chat</Link></li>
         <li><Link to="/llm-logs">LLM Logs</Link></li>
         <li><Link to="/feedback">Feedback</Link></li>
+        <li><Link to="/privacy">Privacy</Link></li>
+        <li><Link to="/documents">Documents</Link></li>
         
         {/* Authentication-dependent links */}
         {isAuthenticated ? (

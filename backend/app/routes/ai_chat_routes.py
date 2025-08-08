@@ -1,23 +1,18 @@
 from flask import Blueprint, request, jsonify, current_app
 import requests
 import json
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from ..services.langchain_agent import LangchainAgentService
 from ..models import LLMLog, db
 
 ai_chat_bp = Blueprint('ai_chat', __name__, url_prefix='/ai-chat')
 
-# Initialize the Langchain agent service
-agent_service = None
+def get_agent_service(jwt_token: str = None):
+    """Create a new Langchain agent service with the provided JWT token."""
+    model_name = current_app.config.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q8_0")
+    return LangchainAgentService(model_name=model_name, jwt_token=jwt_token)
 
-def get_agent_service():
-    """Get or create the Langchain agent service."""
-    global agent_service
-    if agent_service is None:
-        model_name = current_app.config.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q8_0")
-        agent_service = LangchainAgentService(model_name=model_name)
-    return agent_service
-
-def log_llm_interaction(user_message, result):
+def log_llm_interaction(user_message, result, user_id=None):
     """Log LLM interaction to database."""
     try:
         log_entry = LLMLog(
@@ -41,6 +36,7 @@ def chat():
     AI Chat endpoint using Langchain agent with tools
     Expects JSON with 'message' field and optional 'chat_history'
     Returns AI response from Langchain agent
+    Supports both authenticated and unauthenticated users
     """
     try:
         data = request.get_json()
@@ -51,24 +47,40 @@ def chat():
         user_message = data['message']
         chat_history = data.get('chat_history', [])
         
-        # Get the agent service
-        agent = get_agent_service()
+        # Check if user is authenticated
+        jwt_token = None
+        user_id = None
+        try:
+            verify_jwt_in_request()
+            # User is authenticated
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                jwt_token = auth_header.split(' ')[1]
+            user_id = get_jwt_identity()
+        except:
+            # User is not authenticated - continue without JWT token
+            pass
+        
+        # Create a new agent service with or without JWT token
+        agent = get_agent_service(jwt_token=jwt_token)
         
         # Process the message with the agent
         result = agent.chat(
             message=user_message,
-            chat_history=chat_history
+            chat_history=chat_history,
+            jwt_token=jwt_token
         )
         
         # Log the interaction
-        log_llm_interaction(user_message, result)
+        log_llm_interaction(user_message, result, user_id)
         
         if result['success']:
             return jsonify({
                 "response": result['response'],
                 "model": result['model'],
                 "tools_used": len(result['tools_used']) > 0,
-                "tool_details": result['tools_used'] if result['tools_used'] else None
+                "tool_details": result['tools_used'] if result['tools_used'] else None,
+                "authenticated": jwt_token is not None
             }), 200
         else:
             return jsonify({
@@ -116,13 +128,26 @@ def get_llm_logs():
 def get_tools():
     """
     Get information about available tools
+    Supports both authenticated and unauthenticated users
     """
     try:
-        agent = get_agent_service()
+        # Check if user is authenticated
+        jwt_token = None
+        try:
+            verify_jwt_in_request()
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                jwt_token = auth_header.split(' ')[1]
+        except:
+            # User is not authenticated - continue without JWT token
+            pass
+        
+        agent = get_agent_service(jwt_token=jwt_token)
         tools = agent.get_available_tools()
         return jsonify({
             "tools": tools,
-            "model": agent.model_name
+            "model": agent.model_name,
+            "authenticated": jwt_token is not None
         }), 200
     except Exception as e:
         return jsonify({
@@ -151,7 +176,7 @@ def health_check():
             
             # Try to initialize agent service
             try:
-                agent = get_agent_service()
+                agent = get_agent_service(jwt_token=None)
                 tools = agent.get_available_tools()
                 return jsonify({
                     "status": "healthy",

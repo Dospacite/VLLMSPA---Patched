@@ -13,7 +13,7 @@
 }
 
 .logs-header h1 {
-  color: #2c3e50;
+  color: #fff;
   margin-bottom: 10px;
   font-size: 2.5rem;
   font-weight: 700;
@@ -81,7 +81,7 @@
 
 .no-logs h3 {
   margin-bottom: 10px;
-  color: #2c3e50;
+  color: #fff;
 }
 
 .logs-stats {

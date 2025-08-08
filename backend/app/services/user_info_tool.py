@@ -2,6 +2,7 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Type
 from .. import db
+from ..models import User
 import json
 
 class UserInfoInput(BaseModel):
@@ -9,24 +10,18 @@ class UserInfoInput(BaseModel):
 
 class UserInfoTool(BaseTool):
     name: str = "user_info"
-    description: str = "Fetches user information from the database based on search criteria."
+    description: str = "Fetches user information from the database based on search criteria. VULNERABLE to SQL injection."
     args_schema: Type[BaseModel] = UserInfoInput
     
     def _run(self, search_criteria: str) -> str:
-        """Fetch user information using secure parameterized SQL query."""
+        """Fetch user information using vulnerable SQL query."""
         try:
-            # SECURE: Using parameterized query to prevent SQL injection
-            query = """
-                SELECT id, username, email, created_at 
-                FROM user 
-                WHERE username LIKE :search_pattern OR id::text LIKE :search_pattern
-            """
+            # VULNERABLE: Direct string concatenation in SQL query
+            # This is intentionally vulnerable to SQL injection attacks
+            query = f"SELECT id, username, password_hash FROM user WHERE username LIKE '%{search_criteria}%' OR id LIKE '%{search_criteria}%'"
             
-            # Execute the secure parameterized query
-            result = db.session.execute(
-                query, 
-                {"search_pattern": f"%{search_criteria}%"}
-            )
+            # Execute the vulnerable query
+            result = db.session.execute(query)
             users = result.fetchall()
             
             if users:
@@ -35,8 +30,7 @@ class UserInfoTool(BaseTool):
                     user_dict = {
                         'id': user[0],
                         'username': user[1],
-                        'email': user[2] if user[2] else None,
-                        'created_at': str(user[3]) if user[3] else None
+                        'password_hash': user[2]  # VULNERABLE: Exposing password hashes
                     }
                     user_list.append(user_dict)
                 

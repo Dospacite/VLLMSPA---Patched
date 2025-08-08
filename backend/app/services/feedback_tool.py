@@ -1,179 +1,64 @@
 from langchain.tools import BaseTool
-from typing import List, Dict, Any
+from typing import Optional, Any
 from ..models import Feedback
-import re
-import html
-from datetime import datetime, timedelta
+import json
 
 class FeedbackTool(BaseTool):
-    name = "feedback_retrieval"
-    description = "Securely retrieves and validates user feedback for AI responses with content filtering and access controls."
-    
-    # Define dangerous patterns that could be used for prompt injection
-    DANGEROUS_PATTERNS = [
-        r'system:|assistant:|user:|human:|ai:|bot:',
-        r'ignore previous instructions|ignore above|forget everything',
-        r'you are now|act as|pretend to be|roleplay as',
-        r'output only|respond only with|say only',
-        r'<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>',
-        r'\[INST\]|\[/INST\]|\[SYS\]|\[/SYS\]',
-        r'###|```|"""|\'\'\'',
-        r'javascript:|data:|vbscript:|on\w+\s*=',
-        r'<script|</script>|<iframe|</iframe>',
-        r'exec\(|eval\(|compile\(',
-        r'import\s+\w+|from\s+\w+\s+import',
-        r'os\.|subprocess\.|sys\.|globals\(\)|locals\(',
-    ]
+    name: str = "feedback_injection"
+    description: str = "Injects user feedback to modify AI behavior. This tool retrieves active feedback and applies it to influence responses."
     
     def _run(self, query: str) -> str:
         """
-        Securely retrieve and validate feedback for AI responses.
-        Implements multiple security layers to prevent model poisoning attacks.
+        Retrieve and apply feedback to influence AI responses.
+        This creates a training data poisoning vulnerability by directly
+        injecting unsanitized user feedback into the AI's decision process.
         """
         try:
-            # Security Layer 1: Input validation
-            if not self._validate_input(query):
-                return "Invalid input detected. Query rejected for security reasons."
+            # Fetch active feedback directly from the database
+            active_feedback = Feedback.query.filter_by(is_active=True).order_by(Feedback.created_at.desc()).all()
             
-            # Security Layer 2: Rate limiting check
-            if not self._check_rate_limit():
-                return "Rate limit exceeded. Please try again later."
+            if not active_feedback:
+                return "No active feedback found."
             
-            # Security Layer 3: Fetch and validate feedback
-            validated_feedback = self._get_validated_feedback()
+            # Convert feedback objects to dictionaries
+            feedback_list = []
+            for feedback in active_feedback:
+                feedback_list.append({
+                    'prompt': feedback.prompt,
+                    'response': feedback.response,
+                    'author_id': feedback.author_id
+                })
             
-            if not validated_feedback:
-                return "No valid feedback available."
-            
-            # Security Layer 4: Build secure context
-            secure_context = self._build_secure_context(validated_feedback, query)
-            return secure_context
+            # Build feedback injection prompt
+            feedback_injection = self._build_feedback_injection(feedback_list, query)
+            return feedback_injection
                 
         except Exception as e:
-            # Don't expose internal errors to prevent information leakage
-            return "Unable to process feedback request at this time."
+            return f"Error retrieving feedback: {str(e)}"
     
-    def _validate_input(self, query: str) -> bool:
-        """Validate input for potentially malicious content."""
-        if not query or not isinstance(query, str):
-            return False
-        
-        # Check length limits
-        if len(query) > 1000:
-            return False
-        
-        # Check for dangerous patterns
-        query_lower = query.lower()
-        for pattern in self.DANGEROUS_PATTERNS:
-            if re.search(pattern, query_lower, re.IGNORECASE):
-                return False
-        
-        return True
-    
-    def _check_rate_limit(self) -> bool:
-        """Implement basic rate limiting."""
-        # In a real implementation, this would check against a rate limiting service
-        # For now, we'll implement a simple check
-        return True
-    
-    def _get_validated_feedback(self) -> List[Dict[str, Any]]:
-        """Fetch and validate feedback from the database."""
-        try:
-            # Fetch active feedback with additional security filters
-            active_feedback = Feedback.query.filter_by(
-                is_active=True
-            ).order_by(Feedback.created_at.desc()).limit(5).all()  # Limit to prevent overload
-            
-            validated_feedback = []
-            
-            for feedback in active_feedback:
-                # Security validation for each feedback item
-                if self._validate_feedback_item(feedback):
-                    validated_feedback.append({
-                        'prompt': self._sanitize_content(feedback.prompt),
-                        'response': self._sanitize_content(feedback.response),
-                        'created_at': feedback.created_at.isoformat(),
-                        'author': feedback.author.username if feedback.author else 'Unknown'
-                    })
-            
-            return validated_feedback
-            
-        except Exception:
-            return []
-    
-    def _validate_feedback_item(self, feedback: Feedback) -> bool:
-        """Validate individual feedback items for security."""
-        try:
-            # Check content length
-            if len(feedback.prompt) > 500 or len(feedback.response) > 1000:
-                return False
-            
-            # Check for dangerous patterns in prompt
-            prompt_lower = feedback.prompt.lower()
-            for pattern in self.DANGEROUS_PATTERNS:
-                if re.search(pattern, prompt_lower, re.IGNORECASE):
-                    return False
-            
-            # Check for dangerous patterns in response
-            response_lower = feedback.response.lower()
-            for pattern in self.DANGEROUS_PATTERNS:
-                if re.search(pattern, response_lower, re.IGNORECASE):
-                    return False
-            
-            # Check if feedback is not too old (e.g., within last 30 days)
-            if feedback.created_at < datetime.utcnow() - timedelta(days=30):
-                return False
-            
-            return True
-            
-        except Exception:
-            return False
-    
-    def _sanitize_content(self, content: str) -> str:
-        """Sanitize content to prevent injection attacks."""
-        if not content:
-            return ""
-        
-        # HTML escape to prevent XSS
-        sanitized = html.escape(content)
-        
-        # Remove or escape potentially dangerous characters
-        sanitized = re.sub(r'[<>"\']', '', sanitized)
-        
-        # Limit length
-        if len(sanitized) > 500:
-            sanitized = sanitized[:500] + "..."
-        
-        return sanitized
-    
-    def _build_secure_context(self, feedback_list: List[Dict[str, Any]], query: str) -> str:
+    def _build_feedback_injection(self, feedback_list: list, query: str) -> str:
         """
-        Build a secure context that provides feedback without enabling injection attacks.
+        Build a feedback injection prompt that will influence the AI's response.
+        This is the core of the training data poisoning vulnerability.
         """
-        if not feedback_list:
-            return f"QUERY: {self._sanitize_content(query)}"
-        
-        # Create a secure context that doesn't allow direct instruction injection
-        context_parts = []
+        injection_parts = []
         
         for feedback in feedback_list:
-            # Use a safer format that doesn't allow direct instruction injection
-            context_parts.append(
-                f"Example interaction:\n"
-                f"User: {feedback['prompt']}\n"
-                f"Assistant: {feedback['response']}\n"
-            )
+            # No sanitization - directly use user feedback
+            prompt = feedback.get('prompt', '')
+            response = feedback.get('response', '')
+            author_id = feedback.get('author_id', '')
+            
+            # Create injection - all feedback is treated equally
+            injection_parts.append(f"INSTRUCTION: When asked about '{prompt}', respond with: '{response}'")
         
-        # Combine with the original query in a safe way
-        examples = "\n".join(context_parts)
-        safe_query = self._sanitize_content(query)
-        
-        return (
-            f"Based on the following example interactions, provide a helpful response:\n\n"
-            f"{examples}\n"
-            f"Current query: {safe_query}"
-        )
+        if injection_parts:
+            # Combine all feedback injections
+            combined_injection = "\n".join(injection_parts)
+            return f"FEEDBACK INJECTION:\n{combined_injection}\n\nORIGINAL QUERY: {query}"
+        else:
+            return f"ORIGINAL QUERY: {query}"
     
     async def _arun(self, query: str) -> str:
         """Async version of the tool."""
-        return self._run(query)
+        return self._run(query) 

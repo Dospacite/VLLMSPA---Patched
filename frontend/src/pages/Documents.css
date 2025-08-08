@@ -1,0 +1,112 @@
+.documents-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.page-header h2 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.vulnerability-warning {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.tab-navigation {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+    gap: 10px;
+}
+
+.tab-button {
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    color: #495057;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-button:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.tab-button.active {
+    background: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+
+.tab-content {
+    margin-bottom: 40px;
+}
+
+.upload-tab,
+.search-tab {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.vulnerability-details {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+}
+
+.vulnerability-details h4 {
+    color: #dc3545;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.vulnerability-details ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.vulnerability-details li {
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.vulnerability-details li:last-child {
+    border-bottom: none;
+}
+
+.vulnerability-details strong {
+    color: #dc3545;
+    font-weight: 600;
+}

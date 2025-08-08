@@ -133,7 +133,6 @@ const Feedback = () => {
       <h1>AI Training Feedback</h1>
       <p className="feedback-description">
         Submit feedback to influence the AI's behavior. This feedback will be used to train and modify the AI's responses.
-        <strong>Warning: This system has no input sanitization and can be used for training data poisoning.</strong>
       </p>
 
       {!isAuthenticated && (

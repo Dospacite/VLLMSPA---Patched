@@ -32,11 +32,13 @@ def create_app():
     from app.routes.ai_chat_routes import ai_chat_bp
     from app.routes.message_routes import message_bp
     from app.routes.feedback_routes import feedback_bp
+    from app.routes.content_routes import content_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(protected_bp)
     app.register_blueprint(ai_chat_bp)
     app.register_blueprint(message_bp)
     app.register_blueprint(feedback_bp)
+    app.register_blueprint(content_bp)
 
     return app

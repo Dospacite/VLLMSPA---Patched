@@ -4,6 +4,9 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Enable vector extension for embeddings (VULNERABLE: No security controls)
+CREATE EXTENSION IF NOT EXISTS "vector";
+
 -- Create the users table
 CREATE TABLE IF NOT EXISTS "user" (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -34,12 +37,27 @@ CREATE TABLE IF NOT EXISTS llm_log (
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create document embeddings table (VULNERABLE: No access controls, no content validation)
+CREATE TABLE IF NOT EXISTS document_embeddings (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    embedding vector(384), -- VULNERABLE: Fixed dimension, no validation
+    document_metadata JSONB,
+    is_private BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    author_id UUID REFERENCES "user"(id) -- VULNERABLE: Optional, allows anonymous uploads
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_user_username ON "user"(username);
 CREATE INDEX IF NOT EXISTS idx_message_author_id ON message(author_id);
 CREATE INDEX IF NOT EXISTS idx_message_created_at ON message(created_at);
 CREATE INDEX IF NOT EXISTS idx_llm_log_created_at ON llm_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_llm_log_success ON llm_log(success);
+
+-- Create vector similarity search index (VULNERABLE: No access control on search)
+CREATE INDEX IF NOT EXISTS idx_document_embeddings_vector 
+ON document_embeddings USING ivfflat (embedding vector_cosine_ops);
 
 -- Insert a default admin user (optional - remove if not needed)
 -- INSERT INTO "user" (username, password_hash) VALUES 

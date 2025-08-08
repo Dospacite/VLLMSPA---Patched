@@ -13,6 +13,8 @@ class User(db.Model):
     messages = db.relationship('Message', backref='author', lazy=True)
     # Relationship with feedback
     feedback = db.relationship('Feedback', backref='author', lazy=True)
+    # Relationship with document embeddings
+    document_embeddings = db.relationship('DocumentEmbedding', backref='author', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -43,7 +45,7 @@ class Feedback(db.Model):
     response = db.Column(db.Text, nullable=False)  # The desired response
     is_active = db.Column(db.Boolean, default=True, nullable=False)  # Whether this feedback is active
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    author_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    author_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=True)  # Allow anonymous feedback
     
     def to_dict(self):
         return {
@@ -52,7 +54,29 @@ class Feedback(db.Model):
             'response': self.response,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat(),
-            'author': self.author.username,
+            'author': self.author.username if self.author else 'Anonymous',
+            'author_id': self.author_id
+        }
+
+class DocumentEmbedding(db.Model):
+    """VULNERABLE: Document embedding model with no security controls"""
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)  # VULNERABLE: No content sanitization
+    embedding = db.Column(db.Text, nullable=True)  # VULNERABLE: Stored as text, no validation
+    document_metadata = db.Column(db.JSON, nullable=True)  # VULNERABLE: No metadata validation
+    is_private = db.Column(db.Boolean, default=False, nullable=False)  # VULNERABLE: No access control enforcement
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    author_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=True)  # VULNERABLE: Optional, allows anonymous uploads
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'content': self.content,
+            'embedding': self.embedding,
+            'metadata': self.document_metadata,
+            'is_private': self.is_private,
+            'created_at': self.created_at.isoformat(),
+            'author': self.author.username if self.author else 'Anonymous',
             'author_id': self.author_id
         }
 

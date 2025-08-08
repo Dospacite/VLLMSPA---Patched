@@ -1,12 +1,10 @@
 from flask import Blueprint, request, jsonify
-from flask_login import login_required, current_user
 from ..models import Feedback, db
 from sqlalchemy import desc
 
 feedback_bp = Blueprint('feedback', __name__)
 
 @feedback_bp.route('/feedback', methods=['POST'])
-@login_required
 def submit_feedback():
     """Submit feedback for training data poisoning - NO SANITIZATION"""
     try:
@@ -16,11 +14,11 @@ def submit_feedback():
         prompt = data.get('prompt', '')
         response = data.get('response', '')
         
-        # Create new feedback entry
+        # Create new feedback entry without user authentication
         feedback = Feedback(
             prompt=prompt,
             response=response,
-            author_id=current_user.id
+            author_id=None  # Anonymous feedback
         )
         
         db.session.add(feedback)
@@ -40,7 +38,6 @@ def submit_feedback():
         }), 500
 
 @feedback_bp.route('/feedback', methods=['GET'])
-@login_required
 def get_feedback():
     """Get all feedback entries"""
     try:
@@ -57,18 +54,10 @@ def get_feedback():
         }), 500
 
 @feedback_bp.route('/feedback/<int:feedback_id>', methods=['PUT'])
-@login_required
 def update_feedback(feedback_id):
     """Update feedback entry - NO SANITIZATION"""
     try:
         feedback = Feedback.query.get_or_404(feedback_id)
-        
-        # Only allow author to update
-        if feedback.author_id != current_user.id:
-            return jsonify({
-                'success': False,
-                'error': 'Unauthorized'
-            }), 403
         
         data = request.get_json()
         
@@ -96,18 +85,10 @@ def update_feedback(feedback_id):
         }), 500
 
 @feedback_bp.route('/feedback/<int:feedback_id>', methods=['DELETE'])
-@login_required
 def delete_feedback(feedback_id):
     """Delete feedback entry"""
     try:
         feedback = Feedback.query.get_or_404(feedback_id)
-        
-        # Only allow author to delete
-        if feedback.author_id != current_user.id:
-            return jsonify({
-                'success': False,
-                'error': 'Unauthorized'
-            }), 403
         
         db.session.delete(feedback)
         db.session.commit()
